@@ -19,7 +19,6 @@
 extern crate sdl2;
 extern crate zip;
 extern crate image;
-extern crate time;
 extern crate byteorder;
 extern crate serde_json;
 extern crate openssl;
@@ -64,6 +63,7 @@ use std::sync::{Arc, RwLock, Mutex};
 use std::rc::Rc;
 use std::marker::PhantomData;
 use std::thread;
+use std::time;
 use std::sync::mpsc;
 use protocol::mojang;
 use sdl2::Sdl;
@@ -212,8 +212,8 @@ fn main() {
     let renderer = render::Renderer::new(resource_manager.clone());
     let mut ui_container = ui::Container::new();
 
-    let mut last_frame = time::now();
-    let frame_time = (time::Duration::seconds(1).num_nanoseconds().unwrap() as f64) / 60.0;
+    let mut last_frame = time::SystemTime::now();
+    let frame_time = (1000000000f64) / 60.0;
 
     let mut screen_sys = screen::ScreenSystem::new();
     screen_sys.add_screen(Box::new(screen::Login::new(vars.clone())));
@@ -237,10 +237,10 @@ fn main() {
     let mut events = game.sdl.event_pump().unwrap();
     while !game.should_close {
 
-        let now = time::now();
-        let diff = now - last_frame;
+        let now = time::SystemTime::now();
+        let diff = now.duration_since(last_frame).unwrap();
         last_frame = now;
-        let delta = (diff.num_nanoseconds().unwrap() as f64) / frame_time;
+        let delta = ((diff.as_secs() * 1000000000 + diff.subsec_nanos() as u64) as f64) / frame_time;
         let (width, height) = window.drawable_size();
 
         let version = {
@@ -254,7 +254,7 @@ fn main() {
             vsync = vsync_changed;
             sdl_video.gl_set_swap_interval(if vsync { 1 } else { 0 });
         }
-        let fps_cap = *game.vars.get(settings::R_MAX_FPS);
+        let fps_cap = *game.vars.get(settings::R_MAX_FPS) as u64;
 
         game.tick(delta);
         game.server.tick(&mut game.renderer, delta);
@@ -273,10 +273,10 @@ fn main() {
 
 
         if fps_cap > 0 && !vsync {
-            let frame_time = time::now() - now;
-            let sleep_interval = time::Duration::milliseconds(1000 / fps_cap);
+            let frame_time = time::SystemTime::now().duration_since(now).unwrap();
+            let sleep_interval = time::Duration::from_millis(1000 / fps_cap);
             if frame_time < sleep_interval {
-                thread::sleep_ms((sleep_interval - frame_time).num_milliseconds() as u32);
+                thread::sleep(sleep_interval - frame_time);
             }
         }
         window.gl_swap_window();

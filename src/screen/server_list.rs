@@ -13,8 +13,9 @@
 // limitations under the License.
 
 use std::fs;
-use std::thread;
 use std::sync::mpsc;
+use std::thread;
+use std::time;
 use std::rc::Rc;
 use std::cell::RefCell;
 
@@ -25,7 +26,6 @@ use format::{Component, TextComponent};
 use protocol;
 
 use serde_json;
-use time;
 use image;
 use rustc_serialize::base64::FromBase64;
 use rand;
@@ -288,7 +288,7 @@ impl ServerList {
                         msg.modifier.color = Some(format::Color::Red);
                         let _ = send.send(PingInfo {
                             motd: Component::Text(msg),
-                            ping: time::Duration::seconds(99999),
+                            ping: time::Duration::from_secs(99999),
                             exists: false,
                             online: 0,
                             max: 0,
@@ -465,7 +465,7 @@ impl super::Screen for ServerList {
                         s.done_ping = true;
                         s.motd.borrow_mut().set_text(res.motd);
                         // Selects the icon for the given ping range
-                        let y = match res.ping.num_milliseconds() {
+                        let y = match res.ping.as_secs() + res.ping.subsec_nanos() as u64 / 1000000 {
                             _x @ 0 ... 75 => 16.0 / 256.0,
                             _x @ 76 ... 150 => 24.0 / 256.0,
                             _x @ 151 ... 225 => 32.0 / 256.0,

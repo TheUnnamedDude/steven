@@ -31,7 +31,7 @@ use std::convert;
 use byteorder::{BigEndian, WriteBytesExt, ReadBytesExt};
 use flate2::read::{ZlibDecoder, ZlibEncoder};
 use flate2;
-use time;
+use std::time;
 use shared::Position;
 
 pub const SUPPORTED_PROTOCOL: i32 = 109;
@@ -887,7 +887,7 @@ impl Conn {
             return Err(Error::Err("Wrong packet".to_owned()));
         };
 
-        let start = time::now();
+        let start = time::Instant::now();
         try!(self.write_packet(StatusPing { ping: 42 }));
 
         if let Packet::StatusPong(_) = try!(self.read_packet()) {
@@ -895,7 +895,7 @@ impl Conn {
             return Err(Error::Err("Wrong packet".to_owned()));
         };
 
-        let ping = time::now() - start;
+        let ping = start.elapsed();
 
         let val: Value = match serde_json::from_str(&status) {
             Ok(val) => val,
