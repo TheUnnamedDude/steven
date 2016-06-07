@@ -212,8 +212,7 @@ fn main() {
     let renderer = render::Renderer::new(resource_manager.clone());
     let mut ui_container = ui::Container::new();
 
-    let mut last_frame = time::SystemTime::now();
-    let frame_time = (1000000000f64) / 60.0;
+    let mut last_frame = time::Instant::now();
 
     let mut screen_sys = screen::ScreenSystem::new();
     screen_sys.add_screen(Box::new(screen::Login::new(vars.clone())));
@@ -237,10 +236,11 @@ fn main() {
     let mut events = game.sdl.event_pump().unwrap();
     while !game.should_close {
 
-        let now = time::SystemTime::now();
-        let diff = now.duration_since(last_frame).unwrap();
-        last_frame = now;
-        let delta = ((diff.as_secs() * 1000000000 + diff.subsec_nanos() as u64) as f64) / frame_time;
+        let diff = last_frame.elapsed();
+        last_frame = time::Instant::now();
+        let fps_cap = *game.vars.get(settings::R_MAX_FPS) as u64;
+        let frame_time = 1e9 / fps_cap as f64;
+        let delta = (diff.as_secs() as f64 * 1e9 + diff.subsec_nanos() as f64) / frame_time;
         let (width, height) = window.drawable_size();
 
         let version = {
@@ -254,7 +254,6 @@ fn main() {
             vsync = vsync_changed;
             sdl_video.gl_set_swap_interval(if vsync { 1 } else { 0 });
         }
-        let fps_cap = *game.vars.get(settings::R_MAX_FPS) as u64;
 
         game.tick(delta);
         game.server.tick(&mut game.renderer, delta);
@@ -273,10 +272,9 @@ fn main() {
 
 
         if fps_cap > 0 && !vsync {
-            let frame_time = time::SystemTime::now().duration_since(now).unwrap();
-            let sleep_interval = time::Duration::from_millis(1000 / fps_cap);
-            if frame_time < sleep_interval {
-                thread::sleep(sleep_interval - frame_time);
+            let sleep_interval = time::Duration::new(0, frame_time as u32);
+            if last_frame.elapsed() < sleep_interval {
+                thread::sleep(sleep_interval - last_frame.elapsed());
             }
         }
         window.gl_swap_window();
